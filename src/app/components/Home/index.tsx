@@ -13,8 +13,8 @@ import db, { storage } from "@/app/firebase";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { toast } from "react-toastify";
 import NameModel from "./_components/NameModel";
-import { checkValidJSon } from "@/app/utils/checkJson";
-
+ 
+ 
 const HomeComponent = () => {
   if (typeof window !== "undefined") {
     const [audiotext, setaudioText] = useState<any>("");
@@ -29,53 +29,34 @@ const HomeComponent = () => {
     const [userData, setUserData] = useState({ name: "unknown", id: "" });
     const { audioRef, isAvailableRecordedAudio } = recorderControls;
     const [audioFile, setAudioFile] = useState(null as any);
-    const handleuploadAudio = async (e: any, isDropped = false) => {
-      let file;
-
-      setaudioText(JSON.stringify(""));
-      setCovertedText("");
-      if (!isDropped && e?.target?.files && e.target.files[0]) {
-        file = e.target.files[0];
-        setAudioFile(file);
-      } else {
-        file = e[0];
-        setAudioFile(file);
-      }
-      const data = new FormData();
-      data.append("file", file);
-      data.append("model", "whisper-1");
-      data.append("language", "en");
-      if (file.size > 30 * 1024 * 1024) {
-        alert("Please upload an audio file less than 30MB");
-        return;
-      }
-
-      try {
-        setIsloading(true);
-        setSummaryLoading(true);
-        const res = await axios.post(
-          "https://api.openai.com/v1/audio/transcriptions",
-          data,
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
-            },
-          }
-        );
-
-        const tdata = res.data;
-        setCovertedText(tdata.text);
-        setIsloading(false);
-
-        const summaryResponse = await axios.post(
-          "https://api.openai.com/v1/chat/completions",
-          {
-            model: "gpt-4",
-            messages: [
-              {
-                role: "user",
-                content: `
-
+ 
+    const handelTextToSummery = async (data:any) => {
+       try {
+         setIsloading(true);
+         setSummaryLoading(true);
+         const res = await axios.post(
+           "https://api.openai.com/v1/audio/transcriptions",
+           data,
+           {
+             headers: {
+               Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+             },
+           }
+         );
+ 
+         const tdata = res.data;
+         setCovertedText(tdata.text);
+         setIsloading(false);
+ 
+         const summaryResponse = await axios.post(
+           "https://api.openai.com/v1/chat/completions",
+           {
+             model: "gpt-4",
+             messages: [
+               {
+                 role: "user",
+                 content: `
+ 
 Do not include any explanations, only provide a  RFC8259 compliant JSON response  following this format without deviation.give me each data full not cut and save like this ...
 (the given exmple is just a exmple craete data from given text data at the end of the exmple)
 (regards take from ${userData.name})
@@ -163,39 +144,62 @@ Exmple data needed in this format : {
   ]
 }
   ${tdata.text}`,
-              },
-            ],
-          },
-          {
-            headers: {
-              Authorization: `Bearer  ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+               },
+             ],
+           },
+           {
+             headers: {
+               Authorization: `Bearer  ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+               "Content-Type": "application/json",
+             },
+           }
+         );
          setSummaryLoading(false);
          setMainLoading(false);
-        if (summaryResponse.data.choices[0].message.content) {
-          setaudioText(
-            JSON.parse(summaryResponse.data.choices[0].message.content)
-          );
-        } else {
-          toast.error("Please Upload file or audio again")
-          return
-        }
-        
-      } catch (error: any) {
-        toast.error("Please try again later")
-        console.error(error);
-      } finally {
-        setIsloading(false);
-        setSummaryLoading(false);
-        setMainLoading(false);
+         if (summaryResponse.data.choices[0].message.content) {
+           setaudioText(
+             JSON.parse(summaryResponse.data.choices[0].message.content)
+           );
+         } else {
+           toast.error("Please Upload file or audio again");
+           return;
+         }
+       } catch (error: any) {
+         toast.error("Please try again later");
+         console.error(error);
+       } finally {
+         setIsloading(false);
+         setSummaryLoading(false);
+         setMainLoading(false);
+       }
+    }
+    const handleuploadAudio = async (e: any, isDropped = false) => {
+      let file;
+      setaudioText("");
+      setCovertedText("");
+      if (!isDropped && e?.target?.files && e.target.files[0]) {
+        file = e.target.files[0];
+        setAudioFile(file);
+      } else {
+        file = e[0];
+        setAudioFile(file);
       }
+      const data = new FormData();
+      data.append("file", file);
+      data.append("model", "whisper-1");
+      data.append("language", "en");
+      if (file.size > 30 * 1024 * 1024) {
+        alert("Please upload an audio file less than 30MB");
+        return;
+      }
+ 
+      handelTextToSummery(data);
     };
-
+ 
     const createAudioFile = async (blobURL: any) => {
       try {
+        setaudioText("");
+        setCovertedText("");
         setIsloading(true);
         setSummaryLoading(true);
         const reader = new FileReader();
@@ -211,67 +215,14 @@ Exmple data needed in this format : {
             modalData.append("file", file);
             modalData.append("model", "whisper-1");
             modalData.append("language", "en");
-            try {
-              setIsloading(true);
-              setSummaryLoading(true);
-              const reader: any = new FileReader();
-              reader.readAsDataURL(convertToBlob);
-              reader.onloadend = async function () {
-                const response = await axios.post(
-                  "https://api.openai.com/v1/audio/transcriptions",
-                  modalData,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
-                    },
-                  }
-                );
-                const { text } = response.data;
-                setCovertedText(text);
-                setIsloading(false);
-
-                const summaryResponse = await axios.post(
-                  "https://api.openai.com/v1/chat/completions",
-                  {
-                    model: "gpt-3.5-turbo",
-                    messages: [
-                      {
-                        role: "user",
-                        content: `Summarize the following text. Provide a short summary of the meeting and a bulleted list of the main meeting highlights : ${text}`,
-                      },
-                    ],
-                  },
-                  {
-                    headers: {
-                      Authorization: `Bearer  ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
-                      "Content-Type": "application/json",
-                    },
-                  }
-                );
-                setaudioText(summaryResponse.data.choices[0].message.content);
-                setSummaryLoading(false);
-                setMainLoading(false);
-                if (response.status !== 200) {
-                  throw (
-                    response.data.error ||
-                    new Error(`Request failed with status ${response.status}`)
-                  );
-                }
-              };
-            } catch (error: any) {
-              console.error(error);
-              alert(error.message);
-            } finally {
-              setIsloading(false);
-              setSummaryLoading(false);
-            }
+            handelTextToSummery(modalData);
           };
         }
       } catch (error) {
         console.log("error", error);
       }
     };
-
+ 
     useEffect(() => {
       if (audioRef?.current?.currentSrc) {
         createAudioFile(audioRef?.current?.currentSrc);
@@ -286,17 +237,16 @@ Exmple data needed in this format : {
     const handleDrop = (acceptedFiles: any) => {
       handleuploadAudio(acceptedFiles, true);
     };
-
+ 
     const handleDragEnter = () => {
       console.log("Drag enter");
     };
-
+ 
     const handleDragLeave = () => {
       console.log("Drag leave");
     };
-
+ 
     const handleCopy = (content: any) => {
-      console.log("content", content);
       navigator.clipboard
         .writeText(content)
         .then(() => {
@@ -306,9 +256,9 @@ Exmple data needed in this format : {
           console.error("Error copying text to clipboard:", error);
         });
     };
-
-   console.log("audiotext", JSON.stringify(audiotext));
-
+ 
+ 
+ 
     const saveToFirebase = async () => {
       try {
         setSaveLoading(true);
@@ -327,7 +277,7 @@ Exmple data needed in this format : {
         });
         setCurrentDocId(doc.id);
         const fileURLs = [];
-
+ 
         const uuid = uuidv4();
         const fileRef = ref(storage, `audio/${uuid}.mp3`);
         if (audioFile) {
@@ -336,9 +286,9 @@ Exmple data needed in this format : {
               originalName: audioFile.name,
             },
           });
-
+ 
           const downloadURL = await getDownloadURL(fileRef);
-
+ 
           fileURLs.push({
             fileName: `${uuid}.mp3`,
             location: downloadURL,
@@ -359,9 +309,9 @@ Exmple data needed in this format : {
         );
       }
     };
-
+ 
    
-
+ 
     return (
       <>
         <NameModel open={open} id={currentDocId} handleClose={() => {
@@ -378,7 +328,7 @@ Exmple data needed in this format : {
           {({ getRootProps, getInputProps, open, acceptedFiles }: any) => (
             <div {...getRootProps({ className: "dropzone" })}>
               <input {...getInputProps()} />
-
+ 
               <div>
                 <div className="w-full  md:rounded-20 border-0 md:border-1 md:border-grey-200 bg-white md:bg-[#F9F9F9] flex items-center justify-center flex-col">
                   <VoiceVisualizer ref={audioRef} controls={recorderControls} />
@@ -397,7 +347,7 @@ Exmple data needed in this format : {
                     File Name: {acceptedFiles[0].name}
                   </Typography>
                 )}
-
+ 
                 <Typography textAlign="center">
                   Drag in or<Button onClick={open}>upload</Button>a pre-recorded
                   audio.
@@ -406,7 +356,7 @@ Exmple data needed in this format : {
             </div>
           )}
         </Dropzone>
-
+ 
         <div
           style={{
             display: "flex",
@@ -425,7 +375,7 @@ Exmple data needed in this format : {
               transcriptText={audiotext.subjective}
               summaryLoading={summaryLoading}
             />
-
+ 
             <TransciptCard
               title="objective"
               transcriptText={audiotext.objective}
